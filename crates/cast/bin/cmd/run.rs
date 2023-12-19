@@ -1,4 +1,7 @@
-use alloy_primitives::U256;
+use alloy_primitives::{ Address, U256 };
+use cast::revm::primitives::{
+    Bytes, Bytecode, BytecodeState
+};
 use clap::Parser;
 use ethers_providers::Middleware;
 use eyre::{Result, WrapErr};
@@ -70,6 +73,17 @@ pub struct RunArgs {
     /// See also, https://docs.alchemy.com/reference/compute-units#what-are-cups-compute-units-per-second
     #[clap(long, value_name = "NO_RATE_LIMITS", visible_alias = "no-rpc-rate-limit")]
     pub no_rate_limit: bool,
+
+    /// The destination of the transaction.
+    #[clap(short, long, requires = "patch_code")]
+    patch_addr: Address,
+
+    #[clap(
+        long,
+        requires = "patch_addr",
+        value_parser = foundry_common::clap_helpers::strip_0x_prefix
+    )]
+    patch_code: Option<String>,
 }
 
 impl RunArgs {
@@ -185,6 +199,18 @@ impl RunArgs {
                     update_progress!(pb, index);
                 }
             }
+        }
+
+        if let Some(code) = self.patch_code {
+            let address = self.patch_addr;
+            let decoded = hex::decode(code)?;
+            //println!("{}", decoded[0]);
+
+            let code = Bytecode {
+                bytecode: Bytes::copy_from_slice(&decoded),
+                state: BytecodeState::Raw,
+            };
+            executor.set_code(address, code);
         }
 
         // Execute our transaction

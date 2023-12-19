@@ -143,6 +143,15 @@ impl Executor {
         Ok(self.backend.basic_ref(address)?.map(|acc| acc.nonce).unwrap_or_default())
     }
 
+    /// Set the code of an account.
+    pub fn set_code(&mut self, address: Address, bytecode: Bytecode) -> DatabaseResult<&mut Self> {
+        let mut account = self.backend.basic_ref(address)?.unwrap_or_default();
+        account.code = Some(bytecode);
+
+        self.backend.insert_account_info(address, account);
+        Ok(self)
+    }
+
     #[inline]
     pub fn set_tracing(&mut self, tracing: bool) -> &mut Self {
         self.inspector.tracing(tracing);
