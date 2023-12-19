@@ -74,16 +74,28 @@ pub struct RunArgs {
     #[clap(long, value_name = "NO_RATE_LIMITS", visible_alias = "no-rpc-rate-limit")]
     pub no_rate_limit: bool,
 
-    /// The destination of the transaction.
-    #[clap(short, long, requires = "patch_code")]
-    patch_addr: Option<Address>,
-
+    /// The address of the contract to patch.
     #[clap(
         long,
+        num_args = 1..,
+        value_delimiter = ',',
+        requires = "patch_code"
+    )]
+    patch_addr: Option<Vec<Address>>,
+
+    /// The runtime code to replace the `patch_addr` contract with.
+    #[clap(
+        long,
+        num_args = 1..,
+        value_delimiter = ',',
         requires = "patch_addr",
         value_parser = foundry_common::clap_helpers::strip_0x_prefix
     )]
-    patch_code: Option<String>,
+    patch_code: Option<Vec<String>>,
+
+    /// Option to turn off online decoding.
+    #[clap(long)]
+    offline: bool
 }
 
 impl RunArgs {
@@ -201,15 +213,20 @@ impl RunArgs {
             }
         }
 
-        if let Some(code) = self.patch_code {
-            let address = self.patch_addr.unwrap();
-            let decoded = hex::decode(code)?;
+        if let Some(codes) = self.patch_code {
+            if let Some(addrs) = self.patch_addr {
+                for i in 0..codes.len() {
+                    let code = codes[i].clone();
+                    let address = addrs[i].clone();
+                    let decoded = hex::decode(code)?;
+                    let code = Bytecode {
+                        bytecode: Bytes::copy_from_slice(&decoded),
+                        state: BytecodeState::Raw,
+                    };
 
-            let code = Bytecode {
-                bytecode: Bytes::copy_from_slice(&decoded),
-                state: BytecodeState::Raw,
-            };
-            executor.set_code(address, code);
+                    let _ = executor.set_code(address, code);
+                }
+            }
         }
 
         // Execute our transaction
@@ -230,6 +247,7 @@ impl RunArgs {
             }
         };
 
+        config.offline = self.offline;
         handle_traces(result, &config, chain, self.label, self.verbose, self.debug).await?;
 
         Ok(())
