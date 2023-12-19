@@ -76,7 +76,7 @@ pub struct RunArgs {
 
     /// The destination of the transaction.
     #[clap(short, long, requires = "patch_code")]
-    patch_addr: Address,
+    patch_addr: Option<Address>,
 
     #[clap(
         long,
@@ -202,9 +202,8 @@ impl RunArgs {
         }
 
         if let Some(code) = self.patch_code {
-            let address = self.patch_addr;
+            let address = self.patch_addr.unwrap();
             let decoded = hex::decode(code)?;
-            //println!("{}", decoded[0]);
 
             let code = Bytecode {
                 bytecode: Bytes::copy_from_slice(&decoded),
